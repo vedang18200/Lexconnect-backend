@@ -1,0 +1,64 @@
+"""Main FastAPI application entry point"""
+import logging
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from app.core.config import settings
+from app.database.db import init_db
+from app.api.v1 import auth, users, lawyers, cases, consultations, messages, citizens, lawyers_professional, social_workers
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Initialize FastAPI app
+app = FastAPI(
+    title=settings.API_TITLE,
+    version=settings.API_VERSION,
+    description=settings.API_DESCRIPTION,
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Initialize database on startup
+@app.on_event("startup")
+def startup_event():
+    """Initialize database on startup"""
+    try:
+        init_db()
+        logger.info("✅ Database initialized successfully")
+    except Exception as e:
+        logger.error(f"⚠️ Database initialization failed: {e}")
+        logger.info("   Make sure PostgreSQL is running and credentials in .env are correct")
+
+# Health check endpoint
+@app.get("/health")
+def health_check():
+    """Health check endpoint"""
+    return {"status": "ok", "service": "LegalAid India API"}
+
+# Include API routers
+app.include_router(auth.router, prefix="/api/v1", tags=["Authentication"])
+app.include_router(users.router, prefix="/api/v1", tags=["Users"])
+app.include_router(lawyers.router, prefix="/api/v1", tags=["Lawyers"])
+app.include_router(lawyers_professional.router, prefix="/api/v1", tags=["Lawyers Professional"])
+app.include_router(cases.router, prefix="/api/v1", tags=["Cases"])
+app.include_router(consultations.router, prefix="/api/v1", tags=["Consultations"])
+app.include_router(messages.router, prefix="/api/v1", tags=["Messages"])
+app.include_router(citizens.router, prefix="/api/v1", tags=["Citizens"])
+app.include_router(social_workers.router, prefix="/api/v1", tags=["Social Workers"])
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        "app.main:app",
+        host=settings.SERVER_HOST,
+        port=settings.SERVER_PORT,
+        reload=settings.DEBUG,
+    )

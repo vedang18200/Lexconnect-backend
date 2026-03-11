@@ -1,0 +1,1 @@
+"""LegalAid India FastAPI Application"""

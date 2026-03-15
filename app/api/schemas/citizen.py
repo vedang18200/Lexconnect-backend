@@ -194,10 +194,14 @@ class DashboardStats(BaseModel):
     unread_notifications: int
 
 
-class DashboardResponse(BaseModel):
-    """Dashboard response schema"""
-    stats: DashboardStats
-    recent_cases: List[dict]
-    upcoming_consultations: List[dict]
-    recent_reviews: List[dict]
-    recent_notifications: List[NotificationResponse]
+
+# --- Case summary for dashboard ---
+from datetime import date
+
+class CaseSummaryItem(BaseModel):
+    id: int
+    title: str
+    lawyer: str
+    status: str
+    nextHearing: date | None = None
+    description: str | None = None

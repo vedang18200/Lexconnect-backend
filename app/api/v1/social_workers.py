@@ -26,7 +26,7 @@ def create_or_get_profile(
     db: Session = Depends(get_db)
 ):
     """Create or get social worker profile"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     db_profile = SocialWorkerProfileService.get_or_create_profile(db, user_id, profile)
     return db_profile
 
@@ -37,7 +37,7 @@ def get_profile(
     db: Session = Depends(get_db)
 ):
     """Get social worker profile"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     profile = SocialWorkerProfileService.get_profile(db, user_id)
     return profile
 
@@ -49,7 +49,7 @@ def update_profile(
     db: Session = Depends(get_db)
 ):
     """Update social worker profile"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     profile = SocialWorkerProfileService.update_profile(
         db, user_id, update_data.dict(exclude_unset=True)
     )
@@ -65,7 +65,7 @@ def create_referral(
     db: Session = Depends(get_db)
 ):
     """Create a referral"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     db_referral = ReferralService.create_referral(db, user_id, referral)
     return db_referral
 
@@ -79,7 +79,7 @@ def list_referrals(
     db: Session = Depends(get_db)
 ):
     """List referrals created by social worker"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     if status:
         return ReferralService.get_referrals_by_status(db, user_id, status, skip, limit)
     else:
@@ -93,7 +93,7 @@ def get_referral(
     db: Session = Depends(get_db)
 ):
     """Get referral details"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     referral = ReferralService.get_referral(db, referral_id, user_id)
     return referral
 
@@ -106,7 +106,7 @@ def update_referral(
     db: Session = Depends(get_db)
 ):
     """Update referral"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     referral = ReferralService.update_referral(db, referral_id, user_id, update_data)
     return referral
 
@@ -119,7 +119,7 @@ def get_referred_cases(
     db: Session = Depends(get_db)
 ):
     """Get cases referred by this social worker"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     return ReferralService.get_social_worker_referrals(db, user_id, skip, limit)
 
 
@@ -134,7 +134,7 @@ def get_lawyer_referrals(
     db: Session = Depends(get_db)
 ):
     """Get referrals sent to a specific lawyer"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     # Verify user is social worker
     return ReferralService.get_lawyer_referrals(db, lawyer_id, skip, limit)
 
@@ -150,7 +150,7 @@ def get_client_referred_cases(
     db: Session = Depends(get_db)
 ):
     """Get cases referred for a specific client"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     return ReferralService.get_citizen_referred_cases(db, citizen_id, skip, limit)
 
 
@@ -199,7 +199,7 @@ def get_dashboard(
     db: Session = Depends(get_db)
 ):
     """Get social worker dashboard"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     dashboard_data = SocialWorkerDashboardService.get_dashboard_data(db, user_id)
     return dashboard_data
 
@@ -210,7 +210,7 @@ def get_dashboard_stats(
     db: Session = Depends(get_db)
 ):
     """Get dashboard statistics"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     stats = SocialWorkerDashboardService.get_dashboard_stats(db, user_id)
     return stats
 
@@ -222,7 +222,7 @@ def get_impact_report(
     db: Session = Depends(get_db)
 ):
     """Get impact report for period"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     report = SocialWorkerDashboardService.get_impact_report(db, user_id, days)
     return report
 
@@ -236,7 +236,7 @@ def get_agency_dashboard(
     db: Session = Depends(get_db)
 ):
     """Get agency dashboard"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     dashboard_data = SocialWorkerDashboardService.get_agency_dashboard_data(db, agency_id)
     return dashboard_data
 
@@ -248,7 +248,7 @@ def get_agency_stats(
     db: Session = Depends(get_db)
 ):
     """Get agency statistics"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     stats = SocialWorkerDashboardService.get_agency_dashboard_stats(db, agency_id)
     return stats
 
@@ -262,7 +262,7 @@ def get_agency_workers(
     db: Session = Depends(get_db)
 ):
     """Get all workers in agency"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     return SocialWorkerProfileService.get_agency_workers(db, agency_id, skip, limit)
 
 
@@ -279,7 +279,7 @@ def send_coordination_message(
     from app.database.models import DirectMessage
     from datetime import datetime, timezone
 
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
 
     db_message = DirectMessage(
         sender_id=user_id,
@@ -313,7 +313,7 @@ def get_coordination_messages(
     from app.database.models import DirectMessage
     from sqlalchemy import or_
 
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
 
     messages = db.query(DirectMessage).filter(
         or_(

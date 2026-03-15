@@ -149,29 +149,53 @@ class DashboardService:
         )
 
     @staticmethod
-    def get_cases_summary(db: Session, citizen_id: int) -> dict:
-        """Get detailed case summary"""
-        cases = db.query(Case).filter(Case.user_id == citizen_id).all()
+    def get_cases_summary(db: Session, citizen_id: int):
+        """Return top 4 active/recent cases for dashboard cards"""
+        from app.api.schemas.citizen import CaseSummaryItem
+        from sqlalchemy.orm import joinedload
+        from datetime import date
 
-        status_breakdown = {}
+        # Get top 4 most recent/active cases
+        cases = (
+            db.query(Case)
+            .filter(Case.user_id == citizen_id)
+            .order_by(Case.created_at.desc())
+            .limit(4)
+            .all()
+        )
+
+        result = []
         for case in cases:
-            status = case.status
-            if status not in status_breakdown:
-                status_breakdown[status] = 0
-            status_breakdown[status] += 1
+            # Get lawyer name if assigned
+            lawyer_name = None
+            if case.lawyer_id:
+                lawyer = db.query(Lawyer).filter(Lawyer.user_id == case.lawyer_id).first()
+                if lawyer:
+                    lawyer_name = lawyer.name
+            # Get next hearing date from consultations (if any, future only)
+            next_hearing = None
+            consultation = (
+                db.query(Consultation)
+                .filter(
+                    Consultation.case_id == case.id,
+                    Consultation.consultation_date != None,
+                    Consultation.consultation_date >= date.today()
+                )
+                .order_by(Consultation.consultation_date.asc())
+                .first()
+            )
+            if consultation:
+                next_hearing = consultation.consultation_date.date()
 
-        category_breakdown = {}
-        for case in cases:
-            category = case.category or "Uncategorized"
-            if category not in category_breakdown:
-                category_breakdown[category] = 0
-            category_breakdown[category] += 1
-
-        return {
-            "total_cases": len(cases),
-            "status_breakdown": status_breakdown,
-            "category_breakdown": category_breakdown,
-        }
+            result.append(CaseSummaryItem(
+                id=case.id,
+                title=case.title,
+                lawyer=lawyer_name or "-",
+                status=case.status,
+                nextHearing=next_hearing,
+                description=case.description or ""
+            ))
+        return result
 
     @staticmethod
     def get_consultation_summary(db: Session, citizen_id: int) -> dict:

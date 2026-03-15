@@ -31,7 +31,7 @@ def create_or_update_credentials(
     db: Session = Depends(get_db)
 ):
     """Create or update lawyer credentials"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     db_credential = LawyerCredentialService.create_or_update_credential(
         db, user_id, credential
     )
@@ -44,7 +44,7 @@ def get_credentials(
     db: Session = Depends(get_db)
 ):
     """Get lawyer credentials"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     credential = LawyerCredentialService.get_credential(db, user_id)
     return credential
 
@@ -58,7 +58,7 @@ def create_availability(
     db: Session = Depends(get_db)
 ):
     """Create availability slot"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     db_availability = LawyerAvailabilityService.create_availability(
         db, user_id, availability
     )
@@ -71,7 +71,7 @@ def get_all_availability(
     db: Session = Depends(get_db)
 ):
     """Get all availability slots"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     availabilities = LawyerAvailabilityService.get_all_availability(db, user_id)
     return availabilities
 
@@ -83,7 +83,7 @@ def get_availability_by_day(
     db: Session = Depends(get_db)
 ):
     """Get availability for a specific day"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     availabilities = LawyerAvailabilityService.get_availability_by_day(
         db, user_id, day_of_week
     )
@@ -98,7 +98,7 @@ def update_availability(
     db: Session = Depends(get_db)
 ):
     """Update availability slot"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     availability = LawyerAvailabilityService.update_availability(
         db, availability_id, user_id, update_data
     )
@@ -112,7 +112,7 @@ def delete_availability(
     db: Session = Depends(get_db)
 ):
     """Delete availability slot"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     LawyerAvailabilityService.delete_availability(db, availability_id, user_id)
     return {"message": "Availability slot deleted successfully"}
 
@@ -126,7 +126,7 @@ def create_invoice(
     db: Session = Depends(get_db)
 ):
     """Create an invoice"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     db_invoice = InvoiceService.create_invoice(db, user_id, invoice)
     return db_invoice
 
@@ -140,7 +140,7 @@ def list_invoices(
     db: Session = Depends(get_db)
 ):
     """List invoices"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     if status:
         return InvoiceService.get_invoices_by_status(db, user_id, status, skip, limit)
     else:
@@ -154,7 +154,7 @@ def get_invoice(
     db: Session = Depends(get_db)
 ):
     """Get invoice details"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     invoice = InvoiceService.get_invoice(db, invoice_id, user_id)
     return invoice
 
@@ -166,7 +166,7 @@ def issue_invoice(
     db: Session = Depends(get_db)
 ):
     """Issue an invoice"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     invoice = InvoiceService.issue_invoice(db, invoice_id, user_id)
     return invoice
 
@@ -178,7 +178,7 @@ def mark_invoice_paid(
     db: Session = Depends(get_db)
 ):
     """Mark invoice as paid"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     invoice = InvoiceService.mark_invoice_paid(db, invoice_id, user_id)
     return invoice
 
@@ -189,7 +189,7 @@ def get_earnings_summary(
     db: Session = Depends(get_db)
 ):
     """Get earnings summary"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     return InvoiceService.get_earnings_summary(db, user_id)
 
 
@@ -202,7 +202,7 @@ def create_template(
     db: Session = Depends(get_db)
 ):
     """Create document template"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     db_template = DocumentTemplateService.create_template(db, user_id, template)
     return db_template
 
@@ -216,7 +216,7 @@ def list_templates(
     db: Session = Depends(get_db)
 ):
     """List templates"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     if template_type:
         return DocumentTemplateService.get_templates_by_type(
             db, template_type, user_id, skip, limit
@@ -232,7 +232,7 @@ def get_template(
     db: Session = Depends(get_db)
 ):
     """Get template details"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     template = DocumentTemplateService.get_template(db, template_id, user_id)
     return template
 
@@ -245,7 +245,7 @@ def update_template(
     db: Session = Depends(get_db)
 ):
     """Update template"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     template = DocumentTemplateService.update_template(db, template_id, user_id, update_data)
     return template
 
@@ -257,7 +257,7 @@ def delete_template(
     db: Session = Depends(get_db)
 ):
     """Delete template"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     DocumentTemplateService.delete_template(db, template_id, user_id)
     return {"message": "Template deleted successfully"}
 
@@ -271,7 +271,7 @@ def create_case_note(
     db: Session = Depends(get_db)
 ):
     """Create case note"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     db_note = CaseNoteService.create_note(db, user_id, note)
     return db_note
 
@@ -285,7 +285,7 @@ def get_case_notes(
     db: Session = Depends(get_db)
 ):
     """Get case notes"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     return CaseNoteService.get_case_notes(db, case_id, user_id, skip, limit)
 
 
@@ -296,7 +296,7 @@ def get_case_note(
     db: Session = Depends(get_db)
 ):
     """Get case note details"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     note = CaseNoteService.get_note(db, note_id, user_id)
     return note
 
@@ -309,7 +309,7 @@ def update_case_note(
     db: Session = Depends(get_db)
 ):
     """Update case note"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     note = CaseNoteService.update_note(db, note_id, user_id, update_data)
     return note
 
@@ -321,7 +321,7 @@ def mark_note_complete(
     db: Session = Depends(get_db)
 ):
     """Mark case note as complete"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     note = CaseNoteService.mark_note_complete(db, note_id, user_id)
     return note
 
@@ -333,7 +333,7 @@ def delete_case_note(
     db: Session = Depends(get_db)
 ):
     """Delete case note"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     CaseNoteService.delete_note(db, note_id, user_id)
     return {"message": "Case note deleted successfully"}
 
@@ -344,7 +344,7 @@ def get_pending_notes(
     db: Session = Depends(get_db)
 ):
     """Get all pending case notes"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     notes = CaseNoteService.get_pending_notes(db, user_id)
     return [{"id": n.id, "case_id": n.case_id, "content": n.content, "due_date": n.due_date} for n in notes]
 
@@ -357,7 +357,7 @@ def get_dashboard(
     db: Session = Depends(get_db)
 ):
     """Get lawyer dashboard"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     dashboard_data = LawyerDashboardService.get_dashboard_data(db, user_id)
     return dashboard_data
 
@@ -368,7 +368,7 @@ def get_dashboard_stats(
     db: Session = Depends(get_db)
 ):
     """Get dashboard statistics"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     stats = LawyerDashboardService.get_dashboard_stats(db, user_id)
     return stats
 
@@ -379,7 +379,7 @@ def get_cases_summary(
     db: Session = Depends(get_db)
 ):
     """Get case summary"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     return LawyerDashboardService.get_cases_summary(db, user_id)
 
 
@@ -389,7 +389,7 @@ def get_earnings_summary_dashboard(
     db: Session = Depends(get_db)
 ):
     """Get earnings summary"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     return LawyerDashboardService.get_earnings_summary(db, user_id)
 
 
@@ -399,7 +399,7 @@ def get_clients_analytics(
     db: Session = Depends(get_db)
 ):
     """Get client analytics"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     return LawyerDashboardService.get_client_analytics(db, user_id)
 
 
@@ -409,7 +409,7 @@ def get_consultations_analytics(
     db: Session = Depends(get_db)
 ):
     """Get consultation analytics"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     return LawyerDashboardService.get_consultation_analytics(db, user_id)
 
 
@@ -420,7 +420,7 @@ def get_activity_summary(
     db: Session = Depends(get_db)
 ):
     """Get activity summary"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     return LawyerDashboardService.get_activity_summary(db, user_id, days)
 
 
@@ -430,5 +430,5 @@ def get_performance_metrics(
     db: Session = Depends(get_db)
 ):
     """Get performance metrics"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     return LawyerDashboardService.get_performance_metrics(db, user_id)

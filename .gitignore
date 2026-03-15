@@ -11,6 +11,7 @@ env/
 
 # Python
 __pycache__/
+__pycache__
 *.py[cod]
 *$py.class
 *.so
@@ -38,6 +39,8 @@ MANIFEST
 .vscode/
 .idea/
 *.swp
+cache/
+*.cache
 *.swo
 *~
 .DS_Store

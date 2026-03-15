@@ -1,4 +1,5 @@
 """User service"""
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from app.database.models import User
 from app.api.schemas.user import UserCreate, UserUpdate
@@ -57,9 +58,16 @@ class UserService:
         return db.query(User).filter(User.username == username).first()
 
     @staticmethod
+    def get_user_by_username_or_email(db: Session, identifier: str) -> User:
+        """Get user by username or email."""
+        return db.query(User).filter(
+            or_(User.username == identifier, User.email == identifier)
+        ).first()
+
+    @staticmethod
     def authenticate_user(db: Session, username: str, password: str) -> User:
-        """Authenticate user"""
-        user = UserService.get_user_by_username(db, username)
+        """Authenticate user by username or email."""
+        user = UserService.get_user_by_username_or_email(db, username)
         if not user or not verify_password(password, user.password):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

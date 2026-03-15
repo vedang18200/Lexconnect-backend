@@ -15,7 +15,7 @@ from app.api.schemas.citizen import (
     DocumentUploadResponse, DocumentUploadCreate,
     LawyerReviewResponse, LawyerReviewCreate,
     PaymentResponse, PaymentCreate,
-    DashboardResponse, NotificationResponse,
+    NotificationResponse,
     TwoFactorAuthSetup, TwoFactorAuthVerify, TwoFactorAuthResponse
 )
 from typing import List
@@ -32,7 +32,7 @@ def get_profile(
     db: Session = Depends(get_db)
 ):
     """Get citizen profile"""
-    user_id = int(credentials.credentials.split('.')[-1])  # Extract from token
+    user_id = int(credentials.get("sub"))  # Extract from token
     profile = CitizenService.get_citizen_profile(db, user_id)
     return profile
 
@@ -44,7 +44,7 @@ def create_or_update_profile(
     db: Session = Depends(get_db)
 ):
     """Create or update citizen profile"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     profile = CitizenService.update_citizen_profile(db, user_id, profile_update)
     return profile
 
@@ -58,7 +58,7 @@ def setup_2fa(
     db: Session = Depends(get_db)
 ):
     """Setup two-factor authentication"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     two_fa = TwoFactorAuthService.setup_2fa(
         db, user_id, setup.auth_method, setup.phone_number
     )
@@ -86,7 +86,7 @@ def verify_2fa_code(
     db: Session = Depends(get_db)
 ):
     """Verify 2FA code"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     is_valid = TwoFactorAuthService.verify_2fa_code(db, user_id, verify.code)
     return {"is_valid": is_valid, "message": "Code verified successfully"}
 
@@ -98,7 +98,7 @@ def enable_2fa(
     db: Session = Depends(get_db)
 ):
     """Enable two-factor authentication"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     code = verify.code if verify else None
     two_fa = TwoFactorAuthService.enable_2fa(db, user_id, code)
     return two_fa
@@ -110,7 +110,7 @@ def disable_2fa(
     db: Session = Depends(get_db)
 ):
     """Disable two-factor authentication"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     two_fa = TwoFactorAuthService.disable_2fa(db, user_id)
     return two_fa
 
@@ -121,7 +121,7 @@ def get_2fa_status(
     db: Session = Depends(get_db)
 ):
     """Get 2FA status"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     two_fa = TwoFactorAuthService.get_2fa_status(db, user_id)
     return two_fa
 
@@ -132,7 +132,7 @@ def regenerate_backup_codes(
     db: Session = Depends(get_db)
 ):
     """Regenerate backup codes"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     return TwoFactorAuthService.regenerate_backup_codes(db, user_id)
 
 
@@ -142,7 +142,7 @@ def get_qr_code(
     db: Session = Depends(get_db)
 ):
     """Get QR code for TOTP"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     qr_url = TwoFactorAuthService.get_totp_qr_code(db, user_id)
     return {"qr_code_url": qr_url}
 
@@ -159,7 +159,7 @@ async def upload_document(
     db: Session = Depends(get_db)
 ):
     """Upload a document for a case"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
 
     # Simulate file storage (in production, use S3, GCS, etc.)
     file_url = f"/files/{file.filename}"
@@ -188,7 +188,7 @@ def list_documents(
     db: Session = Depends(get_db)
 ):
     """List documents"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
 
     if case_id:
         return DocumentService.get_documents_by_case(db, case_id, user_id, skip, limit)
@@ -203,7 +203,7 @@ def get_document(
     db: Session = Depends(get_db)
 ):
     """Get a specific document"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     document = DocumentService.get_document(db, document_id, user_id)
     return document
 
@@ -215,7 +215,7 @@ def delete_document(
     db: Session = Depends(get_db)
 ):
     """Delete a document"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     DocumentService.delete_document(db, document_id, user_id)
     return {"message": "Document deleted successfully"}
 
@@ -229,7 +229,7 @@ def create_review(
     db: Session = Depends(get_db)
 ):
     """Create a review for a lawyer"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     db_review = ReviewService.create_review(db, user_id, review)
     return db_review
 
@@ -242,7 +242,7 @@ def get_my_reviews(
     db: Session = Depends(get_db)
 ):
     """Get reviews written by the citizen"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     return ReviewService.get_citizen_reviews(db, user_id, skip, limit)
 
 
@@ -264,7 +264,7 @@ def update_review(
     db: Session = Depends(get_db)
 ):
     """Update a review"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     updated_review = ReviewService.update_review(db, review_id, user_id, review_update)
     return updated_review
 
@@ -276,7 +276,7 @@ def delete_review(
     db: Session = Depends(get_db)
 ):
     """Delete a review"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     ReviewService.delete_review(db, review_id, user_id)
     return {"message": "Review deleted successfully"}
 
@@ -310,7 +310,7 @@ def create_payment(
     db: Session = Depends(get_db)
 ):
     """Create a payment"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     db_payment = PaymentService.create_payment(
         db,
         user_id,
@@ -332,7 +332,7 @@ def list_payments(
     db: Session = Depends(get_db)
 ):
     """List citizen's payments"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     return PaymentService.get_citizen_payments(db, user_id, skip, limit)
 
 
@@ -343,7 +343,7 @@ def get_payment(
     db: Session = Depends(get_db)
 ):
     """Get a specific payment"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     payment = PaymentService.get_payment(db, payment_id, user_id)
     return payment
 
@@ -355,7 +355,7 @@ def confirm_payment(
     db: Session = Depends(get_db)
 ):
     """Confirm payment completion"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     payment = PaymentService.confirm_payment(db, payment_id, user_id)
     return payment
 
@@ -367,7 +367,7 @@ def refund_payment(
     db: Session = Depends(get_db)
 ):
     """Request refund for a payment"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     payment = PaymentService.refund_payment(db, payment_id, user_id)
     return payment
 
@@ -380,7 +380,7 @@ def get_dashboard(
     db: Session = Depends(get_db)
 ):
     """Get citizen dashboard with all statistics and recent activity"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     dashboard_data = DashboardService.get_dashboard_data(db, user_id)
     return dashboard_data
 
@@ -391,18 +391,21 @@ def get_dashboard_stats(
     db: Session = Depends(get_db)
 ):
     """Get dashboard statistics"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     stats = DashboardService.get_dashboard_stats(db, user_id)
     return stats.model_dump()
 
 
-@router.get("/dashboard/cases-summary")
+
+from app.api.schemas.citizen import CaseSummaryItem
+
+@router.get("/dashboard/cases-summary", response_model=List[CaseSummaryItem])
 def get_cases_summary(
     credentials: HTTPAuthorizationCredentials = Depends(verify_token),
     db: Session = Depends(get_db)
 ):
-    """Get detailed case summary"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    """Get top 4 case summary items for dashboard cards"""
+    user_id = int(credentials.get("sub"))
     return DashboardService.get_cases_summary(db, user_id)
 
 
@@ -412,7 +415,7 @@ def get_consultations_summary(
     db: Session = Depends(get_db)
 ):
     """Get detailed consultation summary"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     return DashboardService.get_consultation_summary(db, user_id)
 
 
@@ -423,5 +426,5 @@ def get_activity_summary(
     db: Session = Depends(get_db)
 ):
     """Get activity summary for specified period"""
-    user_id = int(credentials.credentials.split('.')[-1])
+    user_id = int(credentials.get("sub"))
     return DashboardService.get_activity_summary(db, user_id, days)

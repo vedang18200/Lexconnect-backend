@@ -47,12 +47,12 @@ def health_check():
 app.include_router(auth.router, prefix="/api/v1", tags=["Authentication"])
 app.include_router(users.router, prefix="/api/v1", tags=["Users"])
 app.include_router(lawyers.router, prefix="/api/v1", tags=["Lawyers"])
-app.include_router(lawyers_professional.router, prefix="/api/v1", tags=["Lawyers Professional"])
+app.include_router(lawyers_professional.router, prefix="/api/v1")
 app.include_router(cases.router, prefix="/api/v1", tags=["Cases"])
 app.include_router(consultations.router, prefix="/api/v1", tags=["Consultations"])
 app.include_router(messages.router, prefix="/api/v1", tags=["Messages"])
-app.include_router(citizens.router, prefix="/api/v1", tags=["Citizens"])
-app.include_router(social_workers.router, prefix="/api/v1", tags=["Social Workers"])
+app.include_router(citizens.router, prefix="/api/v1")
+app.include_router(social_workers.router, prefix="/api/v1")
 
 if __name__ == "__main__":
     import uvicorn

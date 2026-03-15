@@ -24,7 +24,12 @@ class User(Base):
     # Relationships
     lawyer_profile = relationship("Lawyer", back_populates="user", uselist=False)
     citizen_profile = relationship("CitizenProfile", back_populates="user", uselist=False)
-    social_worker_profile = relationship("SocialWorkerProfile", uselist=False, foreign_keys="SocialWorkerProfile.user_id")
+    social_worker_profile = relationship(
+        "SocialWorkerProfile",
+        uselist=False,
+        foreign_keys="SocialWorkerProfile.user_id",
+        back_populates="user",
+    )
     cases = relationship("Case", back_populates="user", foreign_keys="Case.user_id")
     lawyer_cases = relationship("Case", back_populates="lawyer", foreign_keys="Case.lawyer_id")
     consultations = relationship("Consultation", back_populates="user", foreign_keys="Consultation.user_id")
@@ -507,9 +512,15 @@ class SocialWorkerProfile(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
-    user = relationship("User", foreign_keys=[user_id])
+    user = relationship("User", foreign_keys=[user_id], back_populates="social_worker_profile")
     agency = relationship("Agency", back_populates="social_workers")
-    referrals = relationship("Referral", back_populates="social_worker")
+    # Referral.social_worker_id references users.id, so join via profile.user_id.
+    referrals = relationship(
+        "Referral",
+        primaryjoin="SocialWorkerProfile.user_id == Referral.social_worker_id",
+        foreign_keys="Referral.social_worker_id",
+        viewonly=True,
+    )
 
     __table_args__ = (
         Index('ix_social_worker_profiles_user_id', 'user_id'),

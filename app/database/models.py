@@ -106,6 +106,7 @@ class Consultation(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     lawyer_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    case_id = Column(Integer, ForeignKey("cases.id"), nullable=True)
     consultation_type = Column(String(100), nullable=True)
     status = Column(String(100), default="scheduled")  # scheduled, completed, cancelled
     scheduled_at = Column(DateTime(timezone=True), nullable=True)
@@ -119,6 +120,7 @@ class Consultation(Base):
     # Relationships
     user = relationship("User", back_populates="consultations", foreign_keys=[user_id])
     lawyer = relationship("User", back_populates="lawyer_consultations", foreign_keys=[lawyer_id])
+    case = relationship("Case", backref="consultations", foreign_keys=[case_id])
 
     __table_args__ = (
         Index('ix_consultations_id', 'id'),

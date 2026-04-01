@@ -2,9 +2,12 @@
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
+from sqladmin import Admin
 from app.core.config import settings
-from app.database.db import init_db
+from app.database.db import init_db, engine
 from app.api.v1 import auth, users, lawyers, cases, consultations, messages, citizens, lawyers_professional, social_workers
+from app.admin import all_views, authentication_backend
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -17,6 +20,9 @@ app = FastAPI(
     description=settings.API_DESCRIPTION,
 )
 
+# SessionMiddleware must come before Admin (required for auth cookie)
+app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -25,6 +31,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── Admin panel (Django-style) ──────────────────────────────────────────────
+admin = Admin(
+    app,
+    engine,
+    title="LegalAid India — Admin",
+    authentication_backend=authentication_backend,
+)
+
+for view in all_views:
+    admin.add_view(view)
 
 # Initialize database on startup
 @app.on_event("startup")

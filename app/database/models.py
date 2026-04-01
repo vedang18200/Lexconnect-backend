@@ -39,6 +39,9 @@ class User(Base):
     chat_messages = relationship("ChatMessage", back_populates="user")
     two_factor_auth = relationship("TwoFactorAuth", back_populates="user", uselist=False)
 
+    def __str__(self) -> str:
+        return f"{self.username} [{self.user_type}]"
+
     __table_args__ = (
         Index('ix_users_id', 'id'),
     )
@@ -69,6 +72,9 @@ class Lawyer(Base):
     # Relationships
     user = relationship("User", back_populates="lawyer_profile")
 
+    def __str__(self) -> str:
+        return f"{self.name} (Lawyer #{self.id})"
+
     __table_args__ = (
         Index('ix_lawyers_id', 'id'),
     )
@@ -93,6 +99,9 @@ class Case(Base):
     # Relationships
     user = relationship("User", back_populates="cases", foreign_keys=[user_id])
     lawyer = relationship("User", back_populates="lawyer_cases", foreign_keys=[lawyer_id])
+
+    def __str__(self) -> str:
+        return f"#{self.id}: {self.title}"
 
     __table_args__ = (
         Index('ix_cases_id', 'id'),
@@ -490,6 +499,9 @@ class Agency(Base):
 
     # Relationships
     social_workers = relationship("SocialWorkerProfile", back_populates="agency")
+
+    def __str__(self) -> str:
+        return self.name
 
     __table_args__ = (
         Index('ix_agencies_id', 'id'),

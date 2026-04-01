@@ -19,10 +19,40 @@ class CitizenService:
     @staticmethod
     def get_or_create_citizen_profile(db: Session, user_id: int) -> CitizenProfile:
         """Get or create a citizen profile"""
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        if user.user_type != "citizen":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only citizens can have a citizen profile"
+            )
         profile = db.query(CitizenProfile).filter(CitizenProfile.user_id == user_id).first()
         if not profile:
-            profile = CitizenProfile(user_id=user_id)
+            profile = CitizenProfile(
+                user_id=user_id,
+                full_name=user.username,
+                city=user.location,
+            )
             db.add(profile)
+            db.commit()
+            db.refresh(profile)
+            return profile
+
+        # Backfill profile defaults for users who already had an empty profile row.
+        is_updated = False
+        if not profile.full_name and user.username:
+            profile.full_name = user.username
+            is_updated = True
+        if not profile.city and user.location:
+            profile.city = user.location
+            is_updated = True
+
+        if is_updated:
+            profile.updated_at = datetime.now(timezone.utc)
             db.commit()
             db.refresh(profile)
         return profile
@@ -47,6 +77,12 @@ class CitizenService:
     @staticmethod
     def get_citizen_profile(db: Session, user_id: int) -> CitizenProfile:
         """Get citizen profile"""
+        user = db.query(User).filter(User.id == user_id).first()
+        if user and user.user_type != "citizen":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only citizens can access a citizen profile"
+            )
         profile = db.query(CitizenProfile).filter(CitizenProfile.user_id == user_id).first()
         if not profile:
             raise HTTPException(

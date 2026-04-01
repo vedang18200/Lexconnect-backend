@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.database.db import get_db
 from app.core.security import verify_token, get_current_user_id
 from fastapi.security import HTTPAuthorizationCredentials
+from app.database.models import User
 from app.services.citizen_service import CitizenService
 from app.services.document_service import DocumentService
 from app.services.review_service import ReviewService
@@ -21,7 +22,28 @@ from app.api.schemas.citizen import (
 from typing import List
 import os
 
-router = APIRouter(prefix="/citizens", tags=["Citizens"])
+def require_citizen_user(
+    credentials: HTTPAuthorizationCredentials = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    """Allow access only to citizen users for this router."""
+    user_id = int(credentials.get("sub"))
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if user.user_type != "citizen":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only citizen users can access this endpoint",
+        )
+    return user_id
+
+
+router = APIRouter(
+    prefix="/citizens",
+    tags=["Citizens"],
+    dependencies=[Depends(require_citizen_user)],
+)
 
 
 # === PROFILE ENDPOINTS ===
@@ -33,18 +55,20 @@ def get_profile(
 ):
     """Get citizen profile"""
     user_id = int(credentials.get("sub"))  # Extract from token
-    profile = CitizenService.get_citizen_profile(db, user_id)
+    # Auto-create profile on first access so dashboard/profile pages don't fail with 404.
+    profile = CitizenService.get_or_create_citizen_profile(db, user_id)
     return profile
 
 
 @router.post("/profile", response_model=CitizenProfileResponse)
 def create_or_update_profile(
-    profile_update: CitizenProfileUpdate,
+    profile_update: CitizenProfileUpdate | None = None,
     credentials: HTTPAuthorizationCredentials = Depends(verify_token),
     db: Session = Depends(get_db)
 ):
     """Create or update citizen profile"""
     user_id = int(credentials.get("sub"))
+    profile_update = profile_update or CitizenProfileUpdate()
     profile = CitizenService.update_citizen_profile(db, user_id, profile_update)
     return profile
 

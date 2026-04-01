@@ -1,5 +1,5 @@
 """Citizen profile and related schemas"""
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional, List
 from datetime import datetime
 from decimal import Decimal
@@ -16,6 +16,20 @@ class CitizenProfileBase(BaseModel):
     pincode: Optional[str] = None
     bio: Optional[str] = None
     profile_picture_url: Optional[str] = None
+
+    @field_validator("date_of_birth", mode="before")
+    @classmethod
+    def normalize_date_of_birth(cls, value):
+        """Accept common date formats from frontend and treat empty strings as null."""
+        if value in (None, ""):
+            return None
+        if isinstance(value, str):
+            for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y"):
+                try:
+                    return datetime.strptime(value, fmt)
+                except ValueError:
+                    continue
+        return value
 
 
 class CitizenProfileCreate(CitizenProfileBase):

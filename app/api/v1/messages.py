@@ -1,9 +1,10 @@
 """Messaging and chat routes"""
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from app.database.db import get_db
 from app.api.schemas.message import DirectMessageCreate, DirectMessageResponse, ChatMessageCreate, ChatMessageResponse
-from app.core.security import get_current_user_id
+from app.core.security import get_current_user_id, verify_token
 from app.services.messaging_service import MessagingService
 from app.services.chatbot_service import ChatbotService
 
@@ -38,6 +39,16 @@ def mark_message_read(
 ):
     """Mark a message as read"""
     return MessagingService.mark_message_read(db, message_id)
+
+
+@router.get("/messages/conversations")
+def get_conversations(
+    credentials: HTTPAuthorizationCredentials = Depends(verify_token),
+    db: Session = Depends(get_db)
+):
+    """Get list of active conversations for the user"""
+    user_id = int(credentials.get("sub"))
+    return MessagingService.get_conversations(db, user_id)
 
 # Chat Routes
 @router.post("/chat", response_model=ChatMessageResponse)

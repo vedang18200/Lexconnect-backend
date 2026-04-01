@@ -1,5 +1,6 @@
 """Messaging service"""
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from app.database.models import DirectMessage, ChatMessage, User
 from app.api.schemas.message import DirectMessageCreate, ChatMessageCreate
 from fastapi import HTTPException, status
@@ -75,3 +76,62 @@ class MessagingService:
     def get_user_chat_messages(db: Session, user_id: int, skip: int = 0, limit: int = 10):
         """Get all chat messages for a user"""
         return db.query(ChatMessage).filter(ChatMessage.user_id == user_id).offset(skip).limit(limit).all()
+
+    @staticmethod
+    def get_conversations(db: Session, user_id: int):
+        """Get all unique conversations for a user with latest message preview."""
+        from app.database.models import Lawyer
+
+        messages = (
+            db.query(DirectMessage)
+            .filter(
+                or_(
+                    DirectMessage.sender_id == user_id,
+                    DirectMessage.receiver_id == user_id,
+                )
+            )
+            .order_by(DirectMessage.sent_at.desc())
+            .all()
+        )
+
+        latest_by_counterpart: dict[int, DirectMessage] = {}
+        ordered_counterparts: list[int] = []
+
+        for msg in messages:
+            counterpart_id = msg.receiver_id if msg.sender_id == user_id else msg.sender_id
+            if counterpart_id not in latest_by_counterpart:
+                latest_by_counterpart[counterpart_id] = msg
+                ordered_counterparts.append(counterpart_id)
+
+        if not ordered_counterparts:
+            return []
+
+        counterparts = (
+            db.query(User, Lawyer)
+            .outerjoin(Lawyer, Lawyer.user_id == User.id)
+            .filter(User.id.in_(ordered_counterparts))
+            .all()
+        )
+
+        counterpart_map = {
+            user.id: {
+                "name": lawyer.name if lawyer and lawyer.name else user.username,
+                "specialization": lawyer.specialization if lawyer else None,
+                "user_type": user.user_type,
+                "location": user.location,
+            }
+            for user, lawyer in counterparts
+        }
+
+        return [
+            {
+                "id": counterpart_id,
+                "name": counterpart_map.get(counterpart_id, {}).get("name"),
+                "specialization": counterpart_map.get(counterpart_id, {}).get("specialization"),
+                "user_type": counterpart_map.get(counterpart_id, {}).get("user_type"),
+                "location": counterpart_map.get(counterpart_id, {}).get("location"),
+                "last_message": latest_by_counterpart[counterpart_id].message,
+                "last_message_at": latest_by_counterpart[counterpart_id].sent_at,
+            }
+            for counterpart_id in ordered_counterparts
+        ]

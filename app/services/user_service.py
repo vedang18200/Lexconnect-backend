@@ -1,7 +1,7 @@
 """User service"""
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
-from app.database.models import User
+from app.database.models import User, Lawyer
 from app.api.schemas.user import UserCreate, UserUpdate
 from app.core.security import get_password_hash, verify_password
 from fastapi import HTTPException, status
@@ -37,6 +37,21 @@ class UserService:
             language=user.language,
         )
         db.add(db_user)
+
+        # Ensure we have user ID available before creating linked profile rows.
+        db.flush()
+
+        # Auto-create base lawyer profile when a lawyer user registers.
+        if user.user_type == "lawyer":
+            db_lawyer = Lawyer(
+                user_id=db_user.id,
+                name=user.username,
+                email=user.email,
+                phone=user.phone,
+                location=user.location,
+            )
+            db.add(db_lawyer)
+
         db.commit()
         db.refresh(db_user)
         return db_user

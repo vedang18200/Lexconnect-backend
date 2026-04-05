@@ -1,7 +1,6 @@
 """Application configuration using Pydantic Settings"""
 from pydantic_settings import BaseSettings
-from typing import Optional, List
-from pydantic import field_validator
+from typing import List, Optional
 import json
 
 class Settings(BaseSettings):
@@ -23,20 +22,8 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    # CORS Settings
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8080"]
-
-    @field_validator("CORS_ORIGINS", mode="before")
-    @classmethod
-    def parse_cors_origins(cls, v):
-        if isinstance(v, str):
-            try:
-                # Try parsing as JSON first
-                return json.loads(v)
-            except json.JSONDecodeError:
-                # If not JSON, return as single-item list
-                return [v]
-        return v
+    # CORS Settings - provide as JSON string in env or Python list in .env
+    CORS_ORIGINS: Optional[str] = None
 
     # Server Settings
     SERVER_HOST: str = "0.0.0.0"
@@ -45,5 +32,17 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        # Parse CORS_ORIGINS if it's a JSON string
+        if isinstance(self.CORS_ORIGINS, str):
+            try:
+                self.CORS_ORIGINS = json.loads(self.CORS_ORIGINS)
+            except (json.JSONDecodeError, TypeError):
+                # If parsing fails, treat as single origin
+                self.CORS_ORIGINS = [self.CORS_ORIGINS]
+        elif self.CORS_ORIGINS is None:
+            self.CORS_ORIGINS = ["http://localhost:3000", "http://localhost:8080"]
 
 settings = Settings()

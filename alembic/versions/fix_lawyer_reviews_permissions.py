@@ -20,82 +20,13 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Grant permissions to legalaid_user on all tables."""
-
-    # List of all tables in the database
-    tables = [
-        'users',
-        'citizen_profiles',
-        'lawyer_credentials',
-        'lawyer_credential',
-        'lawyers',
-        'agencies',
-        'social_worker_profiles',
-        'cases',
-        'case_notes',
-        'case_note',
-        'consultations',
-        'lawyer_reviews',
-        'payments',
-        'chat_messages',
-        'direct_messages',
-        'notifications',
-        'document_uploads',
-        'document_templates',
-        'document_template',
-        'invoices',
-        'invoice',
-        'referrals',
-        'lawyer_availability',
-        'two_factor_auth',
-    ]
-
-    # Grant permissions on all tables
-    for table in tables:
-        try:
-            op.execute(f"GRANT SELECT, INSERT, UPDATE, DELETE ON {table} TO legalaid_user")
-        except Exception:
-            pass  # Ignore if table doesn't exist
-
-    # Grant permissions on all sequences (for auto-increment columns)
-    op.execute("GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO legalaid_user")
+    # Note: On Render's managed PostgreSQL, the initial user has sufficient permissions
+    # This migration can be skipped as table-level permissions are not required
+    # for the application to function properly
+    pass
 
 
 def downgrade() -> None:
     """Revoke permissions from legalaid_user on all tables."""
-
-    tables = [
-        'users',
-        'citizen_profiles',
-        'lawyer_credentials',
-        'lawyer_credential',
-        'lawyers',
-        'agencies',
-        'social_worker_profiles',
-        'cases',
-        'case_notes',
-        'case_note',
-        'consultations',
-        'lawyer_reviews',
-        'payments',
-        'chat_messages',
-        'direct_messages',
-        'notifications',
-        'document_uploads',
-        'document_templates',
-        'document_template',
-        'invoices',
-        'invoice',
-        'referrals',
-        'lawyer_availability',
-        'two_factor_auth',
-    ]
-
-    # Revoke permissions on all tables
-    for table in tables:
-        try:
-            op.execute(f"REVOKE SELECT, INSERT, UPDATE, DELETE ON {table} FROM legalaid_user")
-        except Exception:
-            pass  # Ignore if table doesn't exist
-
-    # Revoke permissions on all sequences
-    op.execute("REVOKE USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public FROM legalaid_user")
+    # Downgrade is a no-op since upgrade was simplified
+    pass

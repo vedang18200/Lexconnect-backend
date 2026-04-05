@@ -1,6 +1,8 @@
 """Application configuration using Pydantic Settings"""
 from pydantic_settings import BaseSettings
-from typing import Optional
+from typing import Optional, List
+from pydantic import field_validator
+import json
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
@@ -22,7 +24,19 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # CORS Settings
-    CORS_ORIGINS: list = ["http://localhost:3000", "http://localhost:8080"]
+    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8080"]
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v):
+        if isinstance(v, str):
+            try:
+                # Try parsing as JSON first
+                return json.loads(v)
+            except json.JSONDecodeError:
+                # If not JSON, return as single-item list
+                return [v]
+        return v
 
     # Server Settings
     SERVER_HOST: str = "0.0.0.0"

@@ -80,8 +80,9 @@ class MessagingService:
     @staticmethod
     def get_conversations(db: Session, user_id: int):
         """Get all unique conversations for a user with latest message preview."""
-        from app.database.models import Lawyer
+        from app.database.models import Lawyer, Case
 
+        # Get all messages for this user
         messages = (
             db.query(DirectMessage)
             .filter(
@@ -95,21 +96,31 @@ class MessagingService:
         )
 
         latest_by_counterpart: dict[int, DirectMessage] = {}
-        ordered_counterparts: list[int] = []
+        counterparts_from_messages: set[int] = set()
 
         for msg in messages:
             counterpart_id = msg.receiver_id if msg.sender_id == user_id else msg.sender_id
             if counterpart_id not in latest_by_counterpart:
                 latest_by_counterpart[counterpart_id] = msg
-                ordered_counterparts.append(counterpart_id)
+                counterparts_from_messages.add(counterpart_id)
 
-        if not ordered_counterparts:
+        # Get all lawyers from cases assigned to this user
+        cases = db.query(Case).filter(
+            (Case.user_id == user_id) & (Case.lawyer_id.isnot(None))
+        ).all()
+
+        counterparts_from_cases: set[int] = {case.lawyer_id for case in cases}
+
+        # Combine both sets - lawyers from messages and from cases
+        all_counterpart_ids = counterparts_from_messages | counterparts_from_cases
+
+        if not all_counterpart_ids:
             return []
 
         counterparts = (
             db.query(User, Lawyer)
             .outerjoin(Lawyer, Lawyer.user_id == User.id)
-            .filter(User.id.in_(ordered_counterparts))
+            .filter(User.id.in_(all_counterpart_ids))
             .all()
         )
 
@@ -123,8 +134,12 @@ class MessagingService:
             for user, lawyer in counterparts
         }
 
-        return [
-            {
+        # Sort: conversations with messages first (by last message time), then case lawyers (alphabetically)
+        result = []
+
+        # Add conversations with messages (sorted by last message time)
+        for counterpart_id in sorted(counterparts_from_messages, key=lambda x: latest_by_counterpart[x].sent_at, reverse=True):
+            result.append({
                 "id": counterpart_id,
                 "name": counterpart_map.get(counterpart_id, {}).get("name"),
                 "specialization": counterpart_map.get(counterpart_id, {}).get("specialization"),
@@ -132,6 +147,56 @@ class MessagingService:
                 "location": counterpart_map.get(counterpart_id, {}).get("location"),
                 "last_message": latest_by_counterpart[counterpart_id].message,
                 "last_message_at": latest_by_counterpart[counterpart_id].sent_at,
-            }
-            for counterpart_id in ordered_counterparts
-        ]
+            })
+
+        # Add case lawyers without messages
+        for counterpart_id in sorted(counterparts_from_cases - counterparts_from_messages, key=lambda x: counterpart_map.get(x, {}).get("name") or ""):
+            result.append({
+                "id": counterpart_id,
+                "name": counterpart_map.get(counterpart_id, {}).get("name"),
+                "specialization": counterpart_map.get(counterpart_id, {}).get("specialization"),
+                "user_type": counterpart_map.get(counterpart_id, {}).get("user_type"),
+                "location": counterpart_map.get(counterpart_id, {}).get("location"),
+                "last_message": None,
+                "last_message_at": None,
+            })
+
+        return result
+
+    @staticmethod
+    def get_conversation_with_user(db: Session, user_id: int, other_user_id: int) -> dict:
+        """Get or initiate a conversation with a specific user"""
+        from app.database.models import Lawyer
+
+        # Verify the other user exists
+        other_user = db.query(User).filter(User.id == other_user_id).first()
+        if not other_user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+
+        # Get lawyer details if available
+        lawyer = db.query(Lawyer).filter(Lawyer.user_id == other_user_id).first()
+
+        # Get existing messages (if any)
+        existing_messages = db.query(DirectMessage).filter(
+            ((DirectMessage.sender_id == user_id) & (DirectMessage.receiver_id == other_user_id)) |
+            ((DirectMessage.sender_id == other_user_id) & (DirectMessage.receiver_id == user_id))
+        ).order_by(DirectMessage.sent_at.desc()).all()
+
+        # Get last message if exists
+        last_message = existing_messages[0] if existing_messages else None
+
+        return {
+            "id": other_user_id,
+            "name": lawyer.name if lawyer and lawyer.name else other_user.username,
+            "email": other_user.email,
+            "specialization": lawyer.specialization if lawyer else None,
+            "experience": lawyer.experience if lawyer else None,
+            "rating": float(lawyer.rating) if lawyer and lawyer.rating else None,
+            "user_type": other_user.user_type,
+            "location": other_user.location,
+            "last_message": last_message.message if last_message else None,
+            "last_message_at": last_message.sent_at if last_message else None,
+        }

@@ -258,23 +258,27 @@ class CaseAdmin(ModelView, model=Case):
 
     column_list = [
         Case.id, Case.case_number, Case.title, "user", "lawyer",
-        Case.category, Case.status, Case.priority, Case.created_at,
+        Case.category, Case.status, Case.priority, Case.case_progress, Case.created_at,
     ]
     column_details_list = [
         Case.id, Case.case_number, Case.title, Case.description,
         Case.user_id, Case.lawyer_id, Case.category,
-        Case.status, Case.priority, Case.created_at, Case.updated_at,
+        Case.status, Case.priority, Case.court_name,
+        Case.hearing_date, Case.estimated_completion_date, Case.case_progress,
+        Case.created_at, Case.updated_at,
     ]
     form_columns = [
         "user", "lawyer",                        # Select2 dropdowns — prevents null on required FK
         Case.title, Case.description,
         Case.category, Case.status, Case.priority, Case.case_number,
+        Case.court_name, Case.hearing_date, Case.estimated_completion_date, Case.case_progress,
     ]
-    column_searchable_list = [Case.title, Case.case_number, Case.category]
-    column_sortable_list = [Case.id, Case.case_number, Case.status, Case.priority, Case.created_at]
+    column_searchable_list = [Case.title, Case.case_number, Case.category, Case.court_name]
+    column_sortable_list = [Case.id, Case.case_number, Case.status, Case.priority, Case.case_progress, Case.created_at]
     column_filters = [
         StaticValuesFilter(Case.status, values=[
             ("open", "Open"), ("in_progress", "In Progress"),
+            ("active", "Active"), ("pending", "Pending"),
             ("closed", "Closed"), ("resolved", "Resolved"),
         ]),
         StaticValuesFilter(Case.priority, values=[

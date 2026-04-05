@@ -50,6 +50,15 @@ def get_conversations(
     user_id = int(credentials.get("sub"))
     return MessagingService.get_conversations(db, user_id)
 
+@router.get("/messages/conversation/{other_user_id}")
+def get_conversation_with_user(
+    other_user_id: int,
+    user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """Get or initiate a conversation with a specific user"""
+    return MessagingService.get_conversation_with_user(db, user_id, other_user_id)
+
 # Chat Routes
 @router.post("/chat", response_model=ChatMessageResponse)
 def create_chat_message(

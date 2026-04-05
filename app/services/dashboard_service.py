@@ -102,7 +102,7 @@ class DashboardService:
         # Case statistics
         total_cases = db.query(Case).filter(Case.user_id == citizen_id).count()
         active_cases = db.query(Case).filter(
-            and_(Case.user_id == citizen_id, Case.status.in_(["open", "in_progress"]))
+            and_(Case.user_id == citizen_id, Case.status.in_(["open", "in_progress", "active"]))
         ).count()
         resolved_cases = db.query(Case).filter(
             and_(Case.user_id == citizen_id, Case.status.in_(["closed", "resolved"]))

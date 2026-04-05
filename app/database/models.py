@@ -66,6 +66,10 @@ class Lawyer(Base):
     languages = Column(String(500), nullable=True)
     total_cases = Column(Integer, default=0)
     total_clients = Column(Integer, default=0)
+    education = Column(Text, nullable=True)  # JSON or comma-separated education list
+    credentials = Column(Text, nullable=True)  # Bar Council ID and other credentials
+    bar_council_id = Column(String(100), nullable=True)  # e.g. "MH/2008/45678"
+    availability = Column(String(50), default="Available")  # Available, Busy, Not Available
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -90,9 +94,13 @@ class Case(Base):
     title = Column(String(500), nullable=False)
     description = Column(Text, nullable=True)
     category = Column(String(255), nullable=True)
-    status = Column(String(100), default="open")  # open, in_progress, closed, resolved
+    status = Column(String(100), default="open")  # open, in_progress, closed, resolved, active, pending
     priority = Column(String(50), default="medium")  # low, medium, high
     case_number = Column(String(100), unique=True, nullable=True)
+    court_name = Column(String(255), nullable=True)
+    hearing_date = Column(DateTime(timezone=True), nullable=True)
+    estimated_completion_date = Column(DateTime(timezone=True), nullable=True)
+    case_progress = Column(Integer, default=0)  # 0-100 percentage
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

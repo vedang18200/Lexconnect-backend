@@ -14,6 +14,12 @@ class AdminAuth(AuthenticationBackend):
         username = form.get("username")
         password = form.get("password")
 
+        # Check .env credentials first (takes priority)
+        if username == settings.ADMIN_USERNAME and password == settings.ADMIN_PASSWORD:
+            request.session.update({"admin_id": "admin", "admin_name": username})
+            return True
+
+        # Fall back to database lookup
         db: Session = SessionLocal()
         try:
             user = (

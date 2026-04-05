@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     # CORS Settings - provide as JSON string in env or Python list in .env
     CORS_ORIGINS: Optional[str] = None
 
+    # Admin Settings (optional - for admin panel authentication)
+    ADMIN_USERNAME: Optional[str] = "admin"
+    ADMIN_PASSWORD: Optional[str] = "admin123"
+
     # Server Settings
     SERVER_HOST: str = "0.0.0.0"
     SERVER_PORT: int = 8000

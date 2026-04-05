@@ -20,13 +20,23 @@ app = FastAPI(
     description=settings.API_DESCRIPTION,
 )
 
+# Debug: Log CORS settings
+import json
+cors_origins = settings.CORS_ORIGINS
+if isinstance(cors_origins, str):
+    try:
+        cors_origins = json.loads(cors_origins)
+    except:
+        cors_origins = [cors_origins]
+print(f"✅ CORS Origins: {cors_origins}")
+
 # SessionMiddleware must come before Admin (required for auth cookie)
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=cors_origins if isinstance(cors_origins, list) else ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

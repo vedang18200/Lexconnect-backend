@@ -3,15 +3,41 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
 from datetime import datetime, timezone
 from app.database.models import (
-    Case, Consultation, Payment, LawyerReview, Notification, User, Lawyer
+    Case, Consultation, Payment, LawyerReview, Notification, User, Lawyer, DocumentUpload
 )
 from app.services.citizen_service import CitizenService
 from app.services.payment_service import PaymentService
 from app.api.schemas.citizen import DashboardStats
+from fastapi import HTTPException, status
 
 
 class DashboardService:
     """Service for citizen dashboard"""
+
+    @staticmethod
+    def _format_consultation_code(consultation_id: int, created_at: datetime | None) -> str:
+        """Build a stable display ID for consultation cards."""
+        year = created_at.year if created_at else datetime.now(timezone.utc).year
+        return f"CONS-{year}-{consultation_id:04d}"
+
+    @staticmethod
+    def _build_consultation_actions(consultation: Consultation, now: datetime) -> dict:
+        """Derive CTA visibility from status, mode, and schedule."""
+        mode = (consultation.consultation_type or "").lower()
+        scheduled_for = consultation.consultation_date or consultation.scheduled_at
+        is_scheduled = consultation.status == "scheduled"
+
+        can_join_meeting = False
+        if is_scheduled and scheduled_for:
+            delta_minutes = (scheduled_for - now).total_seconds() / 60
+            can_join_meeting = mode in {"video", "video call", "online"} and -15 <= delta_minutes <= 180
+
+        return {
+            "can_view_details": True,
+            "can_join_meeting": can_join_meeting,
+            "can_reschedule": is_scheduled,
+            "can_cancel": is_scheduled,
+        }
 
     @staticmethod
     def get_dashboard_data(db: Session, citizen_id: int) -> dict:
@@ -198,35 +224,301 @@ class DashboardService:
         return result
 
     @staticmethod
-    def get_consultation_summary(db: Session, citizen_id: int) -> dict:
-        """Get detailed consultation summary"""
-        consultations = db.query(Consultation).filter(
-            Consultation.user_id == citizen_id
-        ).all()
+    def get_consultation_summary(
+        db: Session,
+        citizen_id: int,
+        status_filter: str | None = None,
+        mode_filter: str | None = None,
+        query: str | None = None,
+        skip: int = 0,
+        limit: int = 20,
+    ) -> dict:
+        """Get detailed consultation summary with card-ready rows and filters."""
+        now = datetime.now(timezone.utc)
 
-        status_breakdown = {}
-        for consultation in consultations:
-            status = consultation.status
-            if status not in status_breakdown:
-                status_breakdown[status] = 0
-            status_breakdown[status] += 1
+        all_consultations = (
+            db.query(Consultation)
+            .filter(Consultation.user_id == citizen_id)
+            .order_by(Consultation.consultation_date.desc().nullslast(), Consultation.id.desc())
+            .all()
+        )
 
-        type_breakdown = {}
-        for consultation in consultations:
-            consultation_type = consultation.consultation_type or "General"
-            if consultation_type not in type_breakdown:
-                type_breakdown[consultation_type] = 0
-            type_breakdown[consultation_type] += 1
+        status_breakdown: dict[str, int] = {}
+        type_breakdown: dict[str, int] = {}
+        upcoming_count = 0
+        completed_count = 0
+        cancelled_count = 0
+
+        for consultation in all_consultations:
+            status_key = (consultation.status or "scheduled").lower()
+            status_breakdown[status_key] = status_breakdown.get(status_key, 0) + 1
+
+            type_key = (consultation.consultation_type or "General")
+            type_breakdown[type_key] = type_breakdown.get(type_key, 0) + 1
+
+            if status_key == "scheduled":
+                upcoming_count += 1
+            elif status_key == "completed":
+                completed_count += 1
+            elif status_key == "cancelled":
+                cancelled_count += 1
 
         total_fee = db.query(func.sum(Consultation.fee_amount)).filter(
             Consultation.user_id == citizen_id
         ).scalar()
 
+        filtered_consultations = all_consultations
+        if status_filter and status_filter.lower() != "all":
+            normalized_status = status_filter.lower()
+            filtered_consultations = [
+                c for c in filtered_consultations if (c.status or "").lower() == normalized_status
+            ]
+
+        if mode_filter and mode_filter.lower() != "all":
+            normalized_mode = mode_filter.lower()
+            filtered_consultations = [
+                c for c in filtered_consultations if (c.consultation_type or "").lower() == normalized_mode
+            ]
+
+        if query:
+            query_value = query.strip().lower()
+            if query_value:
+                matched_consultations: list[Consultation] = []
+                for consultation in filtered_consultations:
+                    lawyer = db.query(Lawyer).filter(Lawyer.user_id == consultation.lawyer_id).first()
+                    lawyer_name = lawyer.name if lawyer else ""
+                    case_title = consultation.case.title if consultation.case else ""
+                    consultation_code = DashboardService._format_consultation_code(
+                        consultation.id,
+                        consultation.created_at,
+                    )
+
+                    if (
+                        query_value in lawyer_name.lower()
+                        or query_value in case_title.lower()
+                        or query_value in consultation_code.lower()
+                    ):
+                        matched_consultations.append(consultation)
+                filtered_consultations = matched_consultations
+
+        total_filtered = len(filtered_consultations)
+        paginated_consultations = filtered_consultations[skip: skip + limit]
+
+        consultation_cards = []
+        for consultation in paginated_consultations:
+            lawyer_profile = db.query(Lawyer).filter(Lawyer.user_id == consultation.lawyer_id).first()
+            lawyer_user = db.query(User).filter(User.id == consultation.lawyer_id).first()
+            lawyer_name = (
+                lawyer_profile.name
+                if lawyer_profile and lawyer_profile.name
+                else (lawyer_user.username if lawyer_user else "Lawyer")
+            )
+            initials = "".join(part[0] for part in lawyer_name.split()[:2]).upper() if lawyer_name else "LW"
+
+            payment = (
+                db.query(Payment)
+                .filter(
+                    and_(
+                        Payment.citizen_id == citizen_id,
+                        Payment.consultation_id == consultation.id,
+                    )
+                )
+                .order_by(Payment.created_at.desc())
+                .first()
+            )
+
+            attachments = []
+            if consultation.case_id:
+                documents = (
+                    db.query(DocumentUpload)
+                    .filter(
+                        and_(
+                            DocumentUpload.user_id == citizen_id,
+                            DocumentUpload.case_id == consultation.case_id,
+                        )
+                    )
+                    .order_by(DocumentUpload.uploaded_at.desc())
+                    .limit(5)
+                    .all()
+                )
+                attachments = [
+                    {
+                        "id": doc.id,
+                        "name": doc.file_name,
+                        "url": doc.file_url,
+                        "mime_type": doc.mime_type,
+                        "size": doc.file_size,
+                    }
+                    for doc in documents
+                ]
+
+            consultation_cards.append(
+                {
+                    "id": consultation.id,
+                    "consultation_code": DashboardService._format_consultation_code(
+                        consultation.id,
+                        consultation.created_at,
+                    ),
+                    "status": consultation.status,
+                    "consultation_mode": consultation.consultation_type or "General",
+                    "scheduled_at": consultation.consultation_date or consultation.scheduled_at,
+                    "duration_minutes": consultation.duration_minutes,
+                    "note": consultation.notes,
+                    "case": {
+                        "id": consultation.case.id if consultation.case else None,
+                        "title": consultation.case.title if consultation.case else None,
+                        "category": consultation.case.category if consultation.case else None,
+                    },
+                    "lawyer": {
+                        "id": consultation.lawyer_id,
+                        "name": lawyer_name,
+                        "initials": initials,
+                        "specialization": lawyer_profile.specialization if lawyer_profile else None,
+                        "rating": float(lawyer_profile.rating) if lawyer_profile and lawyer_profile.rating is not None else None,
+                    },
+                    "fee": {
+                        "amount": float(consultation.fee_amount) if consultation.fee_amount is not None else None,
+                        "currency": "INR",
+                        "payment_status": payment.status if payment else "pending",
+                    },
+                    "attachments": attachments,
+                    "actions": DashboardService._build_consultation_actions(consultation, now),
+                }
+            )
+
         return {
-            "total_consultations": len(consultations),
+            "summary": {
+                "total": len(all_consultations),
+                "upcoming": upcoming_count,
+                "completed": completed_count,
+                "cancelled": cancelled_count,
+            },
             "status_breakdown": status_breakdown,
             "type_breakdown": type_breakdown,
             "total_fee_spent": float(total_fee) if total_fee else 0.0,
+            "filters": {
+                "status": status_filter or "all",
+                "mode": mode_filter or "all",
+                "query": query or "",
+            },
+            "pagination": {
+                "skip": skip,
+                "limit": limit,
+                "total": total_filtered,
+                "returned": len(consultation_cards),
+            },
+            "consultations": consultation_cards,
+        }
+
+    @staticmethod
+    def get_consultation_detail(db: Session, citizen_id: int, consultation_id: int) -> dict:
+        """Get consultation detail payload for the View Details modal."""
+        now = datetime.now(timezone.utc)
+
+        consultation = (
+            db.query(Consultation)
+            .filter(
+                and_(
+                    Consultation.id == consultation_id,
+                    Consultation.user_id == citizen_id,
+                )
+            )
+            .first()
+        )
+        if not consultation:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Consultation not found",
+            )
+
+        lawyer_profile = db.query(Lawyer).filter(Lawyer.user_id == consultation.lawyer_id).first()
+        lawyer_user = db.query(User).filter(User.id == consultation.lawyer_id).first()
+        lawyer_name = (
+            lawyer_profile.name
+            if lawyer_profile and lawyer_profile.name
+            else (lawyer_user.username if lawyer_user else "Lawyer")
+        )
+        initials = "".join(part[0] for part in lawyer_name.split()[:2]).upper() if lawyer_name else "LW"
+
+        payment = (
+            db.query(Payment)
+            .filter(
+                and_(
+                    Payment.citizen_id == citizen_id,
+                    Payment.consultation_id == consultation.id,
+                )
+            )
+            .order_by(Payment.created_at.desc())
+            .first()
+        )
+
+        documents = []
+        if consultation.case_id:
+            case_documents = (
+                db.query(DocumentUpload)
+                .filter(
+                    and_(
+                        DocumentUpload.user_id == citizen_id,
+                        DocumentUpload.case_id == consultation.case_id,
+                    )
+                )
+                .order_by(DocumentUpload.uploaded_at.desc())
+                .all()
+            )
+            documents = [
+                {
+                    "id": doc.id,
+                    "name": doc.file_name,
+                    "url": doc.file_url,
+                    "mime_type": doc.mime_type,
+                    "size": doc.file_size,
+                    "uploaded_at": doc.uploaded_at,
+                }
+                for doc in case_documents
+            ]
+
+        consultation_mode = consultation.consultation_type or "General"
+        mode_normalized = consultation_mode.lower()
+        meeting_link = None
+        if mode_normalized in {"video", "video call", "online"}:
+            meeting_link = f"/consultations/{consultation.id}/join"
+
+        return {
+            "id": consultation.id,
+            "consultation_code": DashboardService._format_consultation_code(
+                consultation.id,
+                consultation.created_at,
+            ),
+            "status": consultation.status,
+            "lawyer_information": {
+                "id": consultation.lawyer_id,
+                "initials": initials,
+                "name": lawyer_name,
+                "specialization": lawyer_profile.specialization if lawyer_profile else None,
+                "rating": float(lawyer_profile.rating) if lawyer_profile and lawyer_profile.rating is not None else None,
+            },
+            "consultation_details": {
+                "date_time": consultation.consultation_date or consultation.scheduled_at,
+                "duration_minutes": consultation.duration_minutes,
+                "mode": consultation_mode,
+                "fee": {
+                    "amount": float(consultation.fee_amount) if consultation.fee_amount is not None else None,
+                    "currency": "INR",
+                },
+                "related_case": {
+                    "id": consultation.case.id if consultation.case else None,
+                    "title": consultation.case.title if consultation.case else None,
+                },
+                "meeting_link": meeting_link,
+            },
+            "preparation_notes": consultation.notes,
+            "documents": documents,
+            "payment_information": {
+                "consultation_fee": float(consultation.fee_amount) if consultation.fee_amount is not None else None,
+                "currency": "INR",
+                "status": payment.status if payment else "pending",
+            },
+            "actions": DashboardService._build_consultation_actions(consultation, now),
         }
 
     @staticmethod

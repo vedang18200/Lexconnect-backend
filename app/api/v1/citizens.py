@@ -435,12 +435,38 @@ def get_cases_summary(
 
 @router.get("/dashboard/consultations-summary")
 def get_consultations_summary(
+    status: str | None = Query(default=None, description="Filter by status (scheduled/completed/cancelled/all)"),
+    mode: str | None = Query(default=None, description="Filter by consultation mode/type (video/phone/chat/all)"),
+    q: str | None = Query(default=None, description="Search by lawyer name, consultation ID, or case title"),
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=0, le=100),
     credentials: HTTPAuthorizationCredentials = Depends(verify_token),
     db: Session = Depends(get_db)
 ):
     """Get detailed consultation summary"""
     user_id = int(credentials.get("sub"))
-    return DashboardService.get_consultation_summary(db, user_id)
+    # Some frontends send limit=0 initially; treat that as default page size.
+    effective_limit = 20 if limit == 0 else limit
+    return DashboardService.get_consultation_summary(
+        db,
+        user_id,
+        status_filter=status,
+        mode_filter=mode,
+        query=q,
+        skip=skip,
+        limit=effective_limit,
+    )
+
+
+@router.get("/dashboard/consultations/{consultation_id}/details")
+def get_consultation_details(
+    consultation_id: int,
+    credentials: HTTPAuthorizationCredentials = Depends(verify_token),
+    db: Session = Depends(get_db)
+):
+    """Get consultation details for the View Details modal."""
+    user_id = int(credentials.get("sub"))
+    return DashboardService.get_consultation_detail(db, user_id, consultation_id)
 
 
 @router.get("/dashboard/activity")

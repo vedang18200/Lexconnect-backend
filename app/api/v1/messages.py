@@ -41,6 +41,17 @@ def mark_message_read(
     return MessagingService.mark_message_read(db, message_id)
 
 
+@router.put("/messages/conversation/{other_user_id}/read")
+def mark_conversation_read(
+    other_user_id: int,
+    user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """Mark all unread messages from a user in a conversation as read."""
+    updated_count = MessagingService.mark_conversation_read(db, user_id, other_user_id)
+    return {"updated": updated_count}
+
+
 @router.get("/messages/conversations")
 def get_conversations(
     credentials: HTTPAuthorizationCredentials = Depends(verify_token),
@@ -86,3 +97,20 @@ def get_chat_history(
 ):
     """Get chat history for a user"""
     return MessagingService.get_user_chat_messages(db, user_id, skip, limit)
+
+
+@router.get("/chat/quick-questions")
+def get_quick_questions(
+    user_id: int = Depends(get_current_user_id),
+):
+    """Get quick-question cards and starter prompts for LexConnect AI widget."""
+    return ChatbotService.get_quick_questions()
+
+
+@router.get("/chat/suggestions")
+def get_chat_suggestions(
+    context: str | None = None,
+    user_id: int = Depends(get_current_user_id),
+):
+    """Get contextual suggestions for AI chat follow-ups."""
+    return {"suggestions": ChatbotService.get_suggestions(context)}

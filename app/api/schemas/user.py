@@ -41,3 +41,15 @@ class UserListResponse(BaseModel):
     user_type: str
     is_active: bool
     created_at: datetime
+
+
+class ChangePasswordRequest(BaseModel):
+    """Change password request payload"""
+    current_password: str
+    new_password: str
+
+
+class MessageResponse(BaseModel):
+    """Generic success message"""
+    success: bool
+    message: str

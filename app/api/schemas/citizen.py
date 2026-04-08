@@ -14,6 +14,7 @@ class CitizenProfileBase(BaseModel):
     city: Optional[str] = None
     state: Optional[str] = None
     pincode: Optional[str] = None
+    occupation: Optional[str] = None
     bio: Optional[str] = None
     profile_picture_url: Optional[str] = None
 
@@ -39,13 +40,18 @@ class CitizenProfileCreate(CitizenProfileBase):
 
 class CitizenProfileUpdate(CitizenProfileBase):
     """Citizen profile update schema"""
-    pass
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    aadhar_number: Optional[str] = None
 
 
 class CitizenProfileResponse(CitizenProfileBase):
     """Citizen profile response schema"""
     id: int
     user_id: int
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    aadhar_number_masked: Optional[str] = None
     is_kyc_verified: bool
     kyc_verified_at: Optional[datetime] = None
     created_at: datetime
@@ -194,6 +200,57 @@ class NotificationResponse(NotificationBase):
 
     class Config:
         from_attributes = True
+
+
+class NotificationPreferencesBase(BaseModel):
+    """Notification preference settings"""
+    email_notifications: bool = True
+    sms_notifications: bool = True
+    case_updates: bool = True
+    consultation_reminders: bool = True
+    payment_alerts: bool = True
+    marketing_emails: bool = False
+
+
+class NotificationPreferencesUpdate(NotificationPreferencesBase):
+    """Update notification preferences"""
+    pass
+
+
+class NotificationPreferencesResponse(NotificationPreferencesBase):
+    """Notification preferences response"""
+    id: int
+    user_id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class BillingHistoryItem(BaseModel):
+    """Single billing item for profile billing tab"""
+    id: int
+    title: str
+    date: datetime
+    payment_method: str
+    transaction_id: Optional[str] = None
+    amount: float
+    currency: str = "INR"
+    status: str
+
+
+class BillingHistorySummary(BaseModel):
+    """Billing history summary"""
+    total_spent: float
+    currency: str = "INR"
+
+
+class BillingHistoryResponse(BaseModel):
+    """Billing history paginated response"""
+    items: list[BillingHistoryItem]
+    total: int
+    summary: BillingHistorySummary
 
 
 class DashboardStats(BaseModel):

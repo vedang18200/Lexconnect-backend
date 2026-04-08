@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from fastapi import HTTPException, status
 from app.database.models import (
     User, CitizenProfile, Case, Consultation, DirectMessage,
-    DocumentUpload, LawyerReview, Payment, Lawyer
+    DocumentUpload, LawyerReview, Payment, Lawyer, NotificationPreference
 )
 from app.api.schemas.citizen import (
     CitizenProfileCreate, CitizenProfileUpdate, CitizenProfileResponse
@@ -63,16 +63,72 @@ class CitizenService:
     ) -> CitizenProfile:
         """Update citizen profile"""
         profile = CitizenService.get_or_create_citizen_profile(db, user_id)
+        user = db.query(User).filter(User.id == user_id).first()
 
         update_data = profile_update.model_dump(exclude_unset=True)
+
+        # Update user-scoped fields from profile page
+        email = update_data.pop("email", None)
+        phone = update_data.pop("phone", None)
+
+        if email and user:
+            existing_user = db.query(User).filter(User.email == email, User.id != user_id).first()
+            if existing_user:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Email already registered"
+                )
+            user.email = email
+
+        if phone is not None and user:
+            user.phone = phone
+
+        # Persist all profile fields, including secure KYC fields.
         for field, value in update_data.items():
-            if value is not None:
+            if value is not None and hasattr(profile, field):
                 setattr(profile, field, value)
 
         profile.updated_at = datetime.now(timezone.utc)
+        if user:
+            user.updated_at = datetime.now(timezone.utc)
         db.commit()
         db.refresh(profile)
         return profile
+
+    @staticmethod
+    def mask_aadhar_number(aadhar_number: str | None) -> str | None:
+        """Return a masked Aadhaar number for safe API responses."""
+        if not aadhar_number:
+            return None
+        visible = aadhar_number[-4:]
+        return f"XXXX-XXXX-{visible}"
+
+    @staticmethod
+    def get_or_create_notification_preferences(db: Session, user_id: int) -> NotificationPreference:
+        """Get or create default notification preferences for a user."""
+        prefs = db.query(NotificationPreference).filter(NotificationPreference.user_id == user_id).first()
+        if prefs:
+            return prefs
+
+        prefs = NotificationPreference(user_id=user_id)
+        db.add(prefs)
+        db.commit()
+        db.refresh(prefs)
+        return prefs
+
+    @staticmethod
+    def update_notification_preferences(db: Session, user_id: int, updates: dict) -> NotificationPreference:
+        """Update notification preferences for a user."""
+        prefs = CitizenService.get_or_create_notification_preferences(db, user_id)
+
+        for field, value in updates.items():
+            if hasattr(prefs, field):
+                setattr(prefs, field, value)
+
+        prefs.updated_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(prefs)
+        return prefs
 
     @staticmethod
     def get_citizen_profile(db: Session, user_id: int) -> CitizenProfile:

@@ -112,3 +112,29 @@ class UserService:
     def get_lawyers(db: Session, skip: int = 0, limit: int = 10):
         """Get all lawyers"""
         return db.query(User).filter(User.user_type == "lawyer").offset(skip).limit(limit).all()
+
+    @staticmethod
+    def change_password(db: Session, user_id: int, current_password: str, new_password: str) -> None:
+        """Change password for the current user."""
+        db_user = UserService.get_user_by_id(db, user_id)
+
+        if not verify_password(current_password, db_user.password):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Current password is incorrect"
+            )
+
+        if len(new_password) < 8:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="new_password must be at least 8 characters"
+            )
+
+        if verify_password(new_password, db_user.password):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="New password must be different from current password"
+            )
+
+        db_user.password = get_password_hash(new_password)
+        db.commit()

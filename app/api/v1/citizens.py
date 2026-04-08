@@ -17,9 +17,13 @@ from app.api.schemas.citizen import (
     LawyerReviewResponse, LawyerReviewCreate,
     PaymentResponse, PaymentCreate,
     NotificationResponse,
-    TwoFactorAuthSetup, TwoFactorAuthVerify, TwoFactorAuthResponse
+    TwoFactorAuthSetup, TwoFactorAuthVerify, TwoFactorAuthResponse,
+    NotificationPreferencesResponse, NotificationPreferencesUpdate,
+    BillingHistoryResponse
 )
 from typing import List
+from datetime import date
+import json
 import os
 
 def require_citizen_user(
@@ -57,7 +61,28 @@ def get_profile(
     user_id = int(credentials.get("sub"))  # Extract from token
     # Auto-create profile on first access so dashboard/profile pages don't fail with 404.
     profile = CitizenService.get_or_create_citizen_profile(db, user_id)
-    return profile
+    user = db.query(User).filter(User.id == user_id).first()
+    return {
+        "id": profile.id,
+        "user_id": profile.user_id,
+        "full_name": profile.full_name,
+        "email": user.email if user else None,
+        "phone": user.phone if user else None,
+        "date_of_birth": profile.date_of_birth,
+        "gender": profile.gender,
+        "occupation": profile.occupation,
+        "aadhar_number_masked": CitizenService.mask_aadhar_number(profile.aadhar_number),
+        "address": profile.address,
+        "city": profile.city,
+        "state": profile.state,
+        "pincode": profile.pincode,
+        "bio": profile.bio,
+        "profile_picture_url": profile.profile_picture_url,
+        "is_kyc_verified": profile.is_kyc_verified,
+        "kyc_verified_at": profile.kyc_verified_at,
+        "created_at": profile.created_at,
+        "updated_at": profile.updated_at,
+    }
 
 
 @router.post("/profile", response_model=CitizenProfileResponse)
@@ -70,7 +95,28 @@ def create_or_update_profile(
     user_id = int(credentials.get("sub"))
     profile_update = profile_update or CitizenProfileUpdate()
     profile = CitizenService.update_citizen_profile(db, user_id, profile_update)
-    return profile
+    user = db.query(User).filter(User.id == user_id).first()
+    return {
+        "id": profile.id,
+        "user_id": profile.user_id,
+        "full_name": profile.full_name,
+        "email": user.email if user else None,
+        "phone": user.phone if user else None,
+        "date_of_birth": profile.date_of_birth,
+        "gender": profile.gender,
+        "occupation": profile.occupation,
+        "aadhar_number_masked": CitizenService.mask_aadhar_number(profile.aadhar_number),
+        "address": profile.address,
+        "city": profile.city,
+        "state": profile.state,
+        "pincode": profile.pincode,
+        "bio": profile.bio,
+        "profile_picture_url": profile.profile_picture_url,
+        "is_kyc_verified": profile.is_kyc_verified,
+        "kyc_verified_at": profile.kyc_verified_at,
+        "created_at": profile.created_at,
+        "updated_at": profile.updated_at,
+    }
 
 
 # === 2FA ENDPOINTS ===
@@ -98,7 +144,7 @@ def setup_2fa(
     if setup.auth_method.upper() == "TOTP":
         qr_url = TwoFactorAuthService.get_totp_qr_code(db, user_id)
         response["qr_code_url"] = qr_url
-        response["backup_codes"] = two_fa.backup_codes
+        response["backup_codes"] = json.loads(two_fa.backup_codes) if two_fa.backup_codes else []
 
     return response
 
@@ -358,6 +404,50 @@ def list_payments(
     """List citizen's payments"""
     user_id = int(credentials.get("sub"))
     return PaymentService.get_citizen_payments(db, user_id, skip, limit)
+
+
+@router.get("/billing-history", response_model=BillingHistoryResponse)
+def get_billing_history(
+    skip: int = Query(0),
+    limit: int = Query(10),
+    status: str | None = Query(None),
+    from_date: date | None = Query(None),
+    to_date: date | None = Query(None),
+    credentials: HTTPAuthorizationCredentials = Depends(verify_token),
+    db: Session = Depends(get_db)
+):
+    """Get billing history for profile tab."""
+    user_id = int(credentials.get("sub"))
+    return PaymentService.get_billing_history(
+        db,
+        user_id,
+        skip=skip,
+        limit=limit,
+        status_filter=status,
+        from_date=from_date,
+        to_date=to_date,
+    )
+
+
+@router.get("/notification-preferences", response_model=NotificationPreferencesResponse)
+def get_notification_preferences(
+    credentials: HTTPAuthorizationCredentials = Depends(verify_token),
+    db: Session = Depends(get_db)
+):
+    """Get notification preferences for current citizen."""
+    user_id = int(credentials.get("sub"))
+    return CitizenService.get_or_create_notification_preferences(db, user_id)
+
+
+@router.put("/notification-preferences", response_model=NotificationPreferencesResponse)
+def update_notification_preferences(
+    payload: NotificationPreferencesUpdate,
+    credentials: HTTPAuthorizationCredentials = Depends(verify_token),
+    db: Session = Depends(get_db)
+):
+    """Update notification preferences for current citizen."""
+    user_id = int(credentials.get("sub"))
+    return CitizenService.update_notification_preferences(db, user_id, payload.model_dump())
 
 
 @router.get("/payments/{payment_id}", response_model=PaymentResponse)

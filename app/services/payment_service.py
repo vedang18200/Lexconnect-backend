@@ -2,7 +2,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from fastapi import HTTPException, status
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date, time
 from decimal import Decimal
 from uuid import uuid4
 from app.database.models import Payment, Consultation, Case, User
@@ -233,4 +233,78 @@ class PaymentService:
             "total_transactions": total_transactions,
             "lawyers_paid": lawyers_paid,
             "payments": completed_payments
+        }
+
+    @staticmethod
+    def get_billing_history(
+        db: Session,
+        citizen_id: int,
+        skip: int = 0,
+        limit: int = 10,
+        status_filter: str | None = None,
+        from_date: date | None = None,
+        to_date: date | None = None,
+    ) -> dict:
+        """Get billing history for a citizen profile tab with summary and filters."""
+        query = db.query(Payment).filter(Payment.citizen_id == citizen_id)
+
+        if status_filter:
+            query = query.filter(Payment.status == status_filter.lower())
+
+        if from_date:
+            start_dt = datetime.combine(from_date, time.min).replace(tzinfo=timezone.utc)
+            query = query.filter(Payment.created_at >= start_dt)
+
+        if to_date:
+            end_dt = datetime.combine(to_date, time.max).replace(tzinfo=timezone.utc)
+            query = query.filter(Payment.created_at <= end_dt)
+
+        total = query.count()
+        payments = (
+            query
+            .order_by(Payment.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
+
+        completed_query = db.query(Payment).filter(
+            Payment.citizen_id == citizen_id,
+            Payment.status == "completed",
+        )
+
+        if from_date:
+            start_dt = datetime.combine(from_date, time.min).replace(tzinfo=timezone.utc)
+            completed_query = completed_query.filter(Payment.created_at >= start_dt)
+        if to_date:
+            end_dt = datetime.combine(to_date, time.max).replace(tzinfo=timezone.utc)
+            completed_query = completed_query.filter(Payment.created_at <= end_dt)
+
+        total_spent = sum(float(payment.amount) for payment in completed_query.all())
+
+        items = []
+        for payment in payments:
+            lawyer = db.query(User).filter(User.id == payment.lawyer_id).first()
+            lawyer_name = lawyer.username if lawyer else "Lawyer"
+            title = payment.description or f"Payment - {lawyer_name}"
+            items.append(
+                {
+                    "id": payment.id,
+                    "title": title,
+                    "date": payment.created_at,
+                    "payment_method": payment.payment_method,
+                    "transaction_id": payment.transaction_id,
+                    "amount": float(payment.amount),
+                    "currency": "INR",
+                    "status": payment.status.title(),
+                }
+            )
+
+        return {
+            "items": items,
+            "total": total,
+            "summary": {
+                "total_spent": total_spent,
+                "currency": "INR",
+            },
         }

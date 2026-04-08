@@ -35,7 +35,7 @@ class MessagingService:
         return db.query(DirectMessage).filter(
             ((DirectMessage.sender_id == user_id) & (DirectMessage.receiver_id == other_user_id)) |
             ((DirectMessage.sender_id == other_user_id) & (DirectMessage.receiver_id == user_id))
-        ).offset(skip).limit(limit).all()
+        ).order_by(DirectMessage.sent_at.asc()).offset(skip).limit(limit).all()
 
     @staticmethod
     def mark_message_read(db: Session, message_id: int) -> DirectMessage:
@@ -51,6 +51,22 @@ class MessagingService:
         db.commit()
         db.refresh(db_message)
         return db_message
+
+    @staticmethod
+    def mark_conversation_read(db: Session, user_id: int, other_user_id: int) -> int:
+        """Mark all unread incoming messages in a conversation as read."""
+        unread_messages = db.query(DirectMessage).filter(
+            DirectMessage.sender_id == other_user_id,
+            DirectMessage.receiver_id == user_id,
+            DirectMessage.read_at.is_(None),
+        ).all()
+
+        now = datetime.now(timezone.utc)
+        for message in unread_messages:
+            message.read_at = now
+
+        db.commit()
+        return len(unread_messages)
 
     @staticmethod
     def create_chat_message(db: Session, user_id: int, message: ChatMessageCreate) -> ChatMessage:
@@ -134,6 +150,26 @@ class MessagingService:
             for user, lawyer in counterparts
         }
 
+        unread_counts = {
+            counterpart_id: db.query(DirectMessage).filter(
+                DirectMessage.sender_id == counterpart_id,
+                DirectMessage.receiver_id == user_id,
+                DirectMessage.read_at.is_(None),
+            ).count()
+            for counterpart_id in all_counterpart_ids
+        }
+
+        case_context_map = {}
+        for counterpart_id in all_counterpart_ids:
+            case = db.query(Case).filter(
+                Case.user_id == user_id,
+                Case.lawyer_id == counterpart_id,
+            ).order_by(Case.updated_at.desc().nullslast(), Case.created_at.desc()).first()
+            case_context_map[counterpart_id] = {
+                "case_id": case.id if case else None,
+                "case_title": case.title if case else None,
+            }
+
         # Sort: conversations with messages first (by last message time), then case lawyers (alphabetically)
         result = []
 
@@ -145,8 +181,12 @@ class MessagingService:
                 "specialization": counterpart_map.get(counterpart_id, {}).get("specialization"),
                 "user_type": counterpart_map.get(counterpart_id, {}).get("user_type"),
                 "location": counterpart_map.get(counterpart_id, {}).get("location"),
+                "case_id": case_context_map.get(counterpart_id, {}).get("case_id"),
+                "case_title": case_context_map.get(counterpart_id, {}).get("case_title"),
                 "last_message": latest_by_counterpart[counterpart_id].message,
                 "last_message_at": latest_by_counterpart[counterpart_id].sent_at,
+                "unread_count": unread_counts.get(counterpart_id, 0),
+                "is_online": False,
             })
 
         # Add case lawyers without messages
@@ -157,8 +197,12 @@ class MessagingService:
                 "specialization": counterpart_map.get(counterpart_id, {}).get("specialization"),
                 "user_type": counterpart_map.get(counterpart_id, {}).get("user_type"),
                 "location": counterpart_map.get(counterpart_id, {}).get("location"),
+                "case_id": case_context_map.get(counterpart_id, {}).get("case_id"),
+                "case_title": case_context_map.get(counterpart_id, {}).get("case_title"),
                 "last_message": None,
                 "last_message_at": None,
+                "unread_count": unread_counts.get(counterpart_id, 0),
+                "is_online": False,
             })
 
         return result
@@ -166,7 +210,7 @@ class MessagingService:
     @staticmethod
     def get_conversation_with_user(db: Session, user_id: int, other_user_id: int) -> dict:
         """Get or initiate a conversation with a specific user"""
-        from app.database.models import Lawyer
+        from app.database.models import Lawyer, Case
 
         # Verify the other user exists
         other_user = db.query(User).filter(User.id == other_user_id).first()
@@ -188,6 +232,17 @@ class MessagingService:
         # Get last message if exists
         last_message = existing_messages[0] if existing_messages else None
 
+        unread_count = db.query(DirectMessage).filter(
+            DirectMessage.sender_id == other_user_id,
+            DirectMessage.receiver_id == user_id,
+            DirectMessage.read_at.is_(None),
+        ).count()
+
+        case = db.query(Case).filter(
+            Case.user_id == user_id,
+            Case.lawyer_id == other_user_id,
+        ).order_by(Case.updated_at.desc().nullslast(), Case.created_at.desc()).first()
+
         return {
             "id": other_user_id,
             "name": lawyer.name if lawyer and lawyer.name else other_user.username,
@@ -197,6 +252,10 @@ class MessagingService:
             "rating": float(lawyer.rating) if lawyer and lawyer.rating else None,
             "user_type": other_user.user_type,
             "location": other_user.location,
+            "case_id": case.id if case else None,
+            "case_title": case.title if case else None,
             "last_message": last_message.message if last_message else None,
             "last_message_at": last_message.sent_at if last_message else None,
+            "unread_count": unread_count,
+            "is_online": False,
         }

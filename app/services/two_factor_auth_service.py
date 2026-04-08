@@ -66,16 +66,22 @@ class TwoFactorAuthService:
     def verify_2fa_code(db: Session, user_id: int, code: str) -> bool:
         """Verify a 2FA code (TOTP)"""
         two_factor = db.query(TwoFactorAuth).filter(TwoFactorAuth.user_id == user_id).first()
-        if not two_factor or not two_factor.is_enabled:
+        if not two_factor:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Two-factor authentication is not enabled"
+                detail="Two-factor authentication is not set up"
             )
 
         if two_factor.auth_method.upper() != "TOTP":
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="This method does not support TOTP verification"
+            )
+
+        if not two_factor.totp_secret:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="TOTP not setup. Setup TOTP first"
             )
 
         # Verify TOTP code (allow 1 window of drift)
@@ -118,8 +124,13 @@ class TwoFactorAuthService:
                 detail="Two-factor authentication is already enabled"
             )
 
-        # If code is provided, verify it first
-        if code and two_factor.auth_method.upper() == "TOTP":
+        # TOTP requires proof-of-possession before enablement.
+        if two_factor.auth_method.upper() == "TOTP":
+            if not code:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Verification code is required to enable TOTP"
+                )
             TwoFactorAuthService.verify_2fa_code(db, user_id, code)
 
         two_factor.is_enabled = True

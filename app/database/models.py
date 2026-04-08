@@ -38,6 +38,7 @@ class User(Base):
     received_messages = relationship("DirectMessage", back_populates="receiver", foreign_keys="DirectMessage.receiver_id")
     chat_messages = relationship("ChatMessage", back_populates="user")
     two_factor_auth = relationship("TwoFactorAuth", back_populates="user", uselist=False)
+    notification_preferences = relationship("NotificationPreference", back_populates="user", uselist=False)
 
     def __str__(self) -> str:
         return f"{self.username} [{self.user_type}]"
@@ -196,6 +197,7 @@ class CitizenProfile(Base):
     city = Column(String(100), nullable=True)
     state = Column(String(100), nullable=True)
     pincode = Column(String(6), nullable=True)
+    occupation = Column(String(255), nullable=True)
     aadhar_number = Column(String(255), nullable=True)  # Encrypted
     pan_number = Column(String(255), nullable=True)     # Encrypted
     is_kyc_verified = Column(Boolean, default=False)
@@ -345,6 +347,29 @@ class Notification(Base):
     __table_args__ = (
         Index('ix_notifications_user_id', 'user_id'),
         Index('ix_notifications_created_at', 'created_at'),
+    )
+
+
+class NotificationPreference(Base):
+    """Citizen notification preferences"""
+    __tablename__ = "notification_preferences"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+    email_notifications = Column(Boolean, default=True)
+    sms_notifications = Column(Boolean, default=True)
+    case_updates = Column(Boolean, default=True)
+    consultation_reminders = Column(Boolean, default=True)
+    payment_alerts = Column(Boolean, default=True)
+    marketing_emails = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    user = relationship("User", back_populates="notification_preferences")
+
+    __table_args__ = (
+        Index('ix_notification_preferences_user_id', 'user_id'),
     )
 
 

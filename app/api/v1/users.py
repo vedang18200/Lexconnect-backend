@@ -2,7 +2,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database.db import get_db
-from app.api.schemas.user import UserResponse, UserUpdate, UserListResponse
+from app.api.schemas.user import (
+    UserResponse,
+    UserUpdate,
+    UserListResponse,
+    ChangePasswordRequest,
+    MessageResponse,
+)
 from app.core.security import get_current_user_id
 from app.services.user_service import UserService
 
@@ -36,3 +42,14 @@ def get_users(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
 def get_lawyers(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
     """Get all lawyers"""
     return UserService.get_lawyers(db, skip, limit)
+
+
+@router.post("/users/change-password", response_model=MessageResponse)
+def change_password(
+    payload: ChangePasswordRequest,
+    user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+):
+    """Change current user's password."""
+    UserService.change_password(db, user_id, payload.current_password, payload.new_password)
+    return {"success": True, "message": "Password updated successfully"}

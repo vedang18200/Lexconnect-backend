@@ -1,6 +1,7 @@
 """Main FastAPI application entry point"""
 import logging
 from fastapi import FastAPI
+from fastapi import Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from sqladmin import Admin
@@ -69,6 +70,12 @@ def startup_event():
 def health_check():
     """Health check endpoint"""
     return {"status": "ok", "service": "LegalAid India API"}
+
+
+@app.head("/health", include_in_schema=False)
+def health_check_head():
+    """Health check endpoint for HEAD probes"""
+    return Response(status_code=200)
 
 # Include API routers
 app.include_router(auth.router, prefix="/api/v1", tags=["Authentication"])
